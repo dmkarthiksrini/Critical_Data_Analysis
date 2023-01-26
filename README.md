@@ -42,3 +42,9 @@ Our Objective for this Coursework is as follows,
   * based on the previous sections suggest improvements to your model
 * Extension work
   * Model the likelihood of a property being furnished (using the is_furnished variable provided)
+
+
+## How it was done
+
+* We used **Linear Regression** model for the property price and critiqued the model using relevant diagnostics
+* For the likelihood of property being furnished , we build a model based on the **Logistic Regression**
