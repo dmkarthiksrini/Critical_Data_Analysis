@@ -1,0 +1,585 @@
+---
+title: "CS5801 Coursework Template Proforma"
+author: '2218930'
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+version: 1
+---
+
+
+* **Import Libraries**
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(skimr)
+library(devtools)
+library(GGally)
+```
+
+
+
+# 1. Organise and clean the data
+
+## 1.1 Subset the data into the specific dataset allocated
+
+
+* house-analysis.RDa is a local DB which has 90377 Observations with 12 Variables,
+
+```
+| Variable   (Column Name) | Description                                                                  |
+|--------------------------|------------------------------------------------------------------------------|
+| id                       | Property id                                                                  |
+| Price                    | Sale price of the   property                                                 |
+| mq                       | Total square meters   of the property                                        |
+| Floor                    | Entrance floor of the   property                                             |
+| n_rooms                  | Total number of rooms                                                        |
+| n_bathrooms              | Total number of   bathrooms                                                  |
+| has_terrace              | Property has a   terrace                                                     |
+| has_alarm                | Property has an alarm                                                        |
+| heating                  | Type of heating   (“autonomous”, “ other”)                                   |
+| has_air_conditioning     | Property has Air   conditioning                                              |
+| has_parking              | Property has parking                                                         |
+| Is_furnished             |     Was the property sold with its contents (furnishings) or   not? (0,1)    |
+```
+
+
+* Our first goal is to create a subset out of this local and create sample data unique for us based on the student_id.
+
+```{r}
+SID <- 2218930                  
+SIDoffset <- (SID %% 100) + 1    # SID mod 100 + 1
+
+load("CS5801-data-and-proforma 2/house-analysis.RDa")
+
+mydf <- house.analysis[seq(from=SIDoffset,to=nrow(house.analysis),by=100),]
+```
+
+#### Observation:
+
+* Above R code helps in creating the subset of data from the **house-analysis.Rda** Local Databse
+* **load** function helps in Loading the Local Database from which we created a dataframe **mydf**
+* **seq** - Sequence Generation from base r used to create regular data sequence, **SIDoffset** variable is offset meant to create starting and ending values for the sequence
+* **nrow** is meant to identify the number of Rows in the Database, here it means to **90377**
+* **by** is meant for the sequence increment (gap).
+
+
+
+## 1.2 Data quality analysis
+ 
+
+#### Idea for the Data Quality Analysis
+
+* This section is meant to check the Data Quality, This includes validating the below mentioned things to the most.
+  * Checking for Missing Values in the Data
+  * Data Inconsistency (Ambiguous Data)
+  * Normality
+  * Randomness
+  * Outlier Detection
+
+```{r}
+skim(mydf)  #(SKIMR: Quickly profile data in R 2021)
+```
+
+#### Observation
+
+
+* There were a total of 12 Variables we have in the dataset.
+* Out of the 12 Variables 11 is Numeric, 1 is Character (Categorical)
+* There is No Null Values / Missing Values (No **na** values) in the datatset
+* But When we look at the data except the **price** & **mq** variable rest are all of having a binary value ( has certain facility or not ) or category levels (floor, number of rooms/bathrooms)
+* Variable **id** is the index value from the local DB which is not necessary for the Analysis
+
+```{r}
+table(mydf$heating)
+```
+
+#### Observation
+
+* By creating Table for the Categorical Variable **heating** it shows that it has three Levels, but by looking at the Valriable Header it is evident its an Inconsistency in Data.
+* **Autonomous** with two different spelling. We will perform cleaning/neutralizing this Ambiguity in the Data cleaning Process.
+
+```{r}
+names(mydf)
+```
+
+
+```{r}
+summary(mydf)
+```
+* To identify class of each Columns
+
+```{r}
+sapply(mydf,class)
+```
+
+
+#### Observations
+
+* Based on the Previous  Analysis, the **price** and **mq** are the two numerical Variable makes sense to the data.
+* We will look for the Inconsistency (Outliers) in them if any?
+
+
+```{r}
+hist(x = mydf$price, main = "Histogram Analysis for House Sales Price")
+```
+
+
+```{r}
+hist(x = mydf$mq, main = "Histogram Analysis for House Area in mq (Square Metre)")
+```
+#### Observation
+
+* Based on the above 2 Histogram analysis both **House Price** and **House area mq** are rightly skewed (Positively Skewed) , in other words it is not normally distributed. But It dint show is there any Outliers or not clearly.
+
+* In this section QQ Plot and Box Plot is used to detect the type of Distribution and  Outliers
+
+```{r}
+ggplot(data = mydf, aes(sample=price)) + stat_qq() + ggtitle("QQ Plot Analysis of the House price") + stat_qq_line()
+```
+
+```{r}
+ggplot(data = mydf, aes(sample=mq)) + stat_qq() + ggtitle("QQ Plot Analysis of the House Area mq") + stat_qq_line()
+```
+
+
+
+
+```{r}
+ggplot(data = mydf, aes(price)) + geom_boxplot() + ggtitle("BoxPlot Analysis of House Price")
+```
+
+```{r}
+ggplot(data = mydf, aes(mq)) + geom_boxplot() + ggtitle("BoxPlot Analysis of House Area mq")
+```
+
+#### Observation
+
+* Based on the Above Analysis both **price** and **mq** has Outliers , when compared together **mq** has more outliers than **price**
+* Based on the QQ Plot its shows that both the variable are Right Skewed
+ 
+## 1.3 Data cleaning  
+ 
+
+* In General, Data Cleaning's main intent is to make up the data based on the previous quality checks to get it ready for the further Analysis and Processing. So here the main focus is to take decision on the data ambiguity like to remove , replace or impute
+
+
+#### Replacing the Ambiguous Data
+
+* Based on the Table Analysis found data ambiguity in the **heating** variable, Will be replacing it with correct value
+
+```{r}
+table(mydf$heating)
+```
+
+```{r}
+mydf[mydf == "autonamous"] <- "autonomous"
+```
+
+
+
+```{r}
+table(mydf$heating)
+```
+
+#### Outcome
+
+* Ambiguous **heating** data has been replaced with correct format to avoid inconsistency 
+
+#### Data transformation to Eliminate Skeweness
+
+* "When our original continuous data do not follow the bell curve, we can log transform this data to make it as **normal** as possible so that the statistical analysis results from this data become more valid" **(Log Transformation Purpose and Interpretation 2020)**
+* Based on the above, when we cross reference our data **price**  is Positively Skewed, to fix this **Log Transformation** will be done as below for the further analysis
+
+```{r}
+mydf$log_house_price<-log(mydf$price)
+head(mydf)
+```
+
+
+```{r}
+hist(mydf$log_house_price)
+```
+
+
+```{r}
+mydf$log_mq<-log(mydf$mq)
+head(mydf)
+```
+
+```{r}
+hist(mydf$mq)
+```
+
+
+```{r}
+hist(mydf$log_mq)
+```
+
+
+#### Outcome
+
+* Based on the above histogram **log_house_price** and **log_mq** is normally distributed
+
+#### Converting Data into Factors
+
+* Based on the Analysis, it was found that we have 11 numerical Variable, but on checking the data it was found 9 variables are either as a Binary value or having categories/levels
+* As Martin stated, to make better use of this data all these binary or level based numerical values will be converted to Factors (Shepperd, CS5702 modern data book 2022)
+
+```{r}
+names <- c("floor", "n_rooms","n_bathrooms" ,"has_terrace","has_alarm","heating", "has_air_conditioning","has_parking" ,"is_furnished")
+mydf[,names] <- lapply(mydf[,names] , factor)
+summary(mydf)
+```
+
+#### Removing Non-Value Added Variable Data 
+
+* From the Previous Observation, **id** variable is identified as non value added in the data, will remove the same.
+
+```{r}
+mydf <- mydf[,2:14]
+```
+
+```{r}
+str(mydf)
+```
+
+
+# 2. Exploratory Data Analysis (EDA)
+
+## 2.1 EDA plan
+
+* "Exploratory data analysis (EDA) aims to describe the main characteristics of a data set often using visual techniques. Wikipedia defines it as 'an approach to analyzing data sets to summarise their main characteristics, often with visual methods'.
+  It is an iterative process typically:
+  1. Eyeball the data and look for patterns 
+  2. Generate questions
+  3. Search for answers by visualising, transforming, and modelling
+  4. Repeat" (Shepperd, Introducing exploratory data analysis 2022)
+* EDA is considered integral part of the Data storytelling, this helps in understanding the each variable is the data and their relationship between one another and how it might influence the end results of the Models, by studying the Patterns, anomalies, Variations, testing and evaluating the hypothesis. 
+* In this we mainly focus on understanding each variable numerically and graphically (Univariate Analysis) and it is related to each other (Correlation - Multivariate Analysis)
+
+```{r}
+summary(mydf)
+```
+
+#### Outcome
+
+Listed below are the findings from the summary,
+* **price** - Average House Price is 141916, and this falls between the range of 1000 being Minimum and 500000 being Maximum, Looking at the Median value which is 11900 which is less than mean. This represent that the data is Positively Skewed.
+* **mq** - Average House area is 112.34 in square metres, minimum value is 0 which is an implausible one, we will look into that further
+* **is_furnished** shows out of 904 observations 838 houses are not furnished and rest are furnished
+* Other variables : Number of Houses with 1 floor is very high nearly half of the data likewise for the rest of the variable **has_terrace**,  **has_alarm**, **is_furnished**, **has_parking** and **has_air_conditioning** denotes those features are not available
+* Looking at the **n_room** it shows negative value which is also improbable.
+
+#### Deep dive on the Inconsistencies identified
+* House with area **0 mq**, since this contributes to less % of data we will remove that entry from the subset
+
+```{r}
+mydf[mydf$mq < 20,]
+```
+
+
+```{r}
+mydf <- mydf %>% filter(mydf$mq > 0)
+```
+
+```{r}
+summary(mydf)
+```
+
+* Now replacing the redundant value with right value , considering it as a data misinterpretation for (1 was misinterpret as -1)
+
+```{r}
+mydf[mydf$n_rooms == -1,]
+```
+
+```{r}
+levels(mydf$n_rooms)[levels(mydf$n_rooms)=='-1'] <- '1'
+```
+
+```{r}
+levels(mydf$n_rooms)=='-1'
+```
+
+
+```{r}
+levels(mydf$n_rooms)
+```
+
+```{r}
+summary(mydf)
+```
+```{r}
+mydf[mydf$n_rooms == 1,]
+```
+
+
+#### Outcome
+
+* Minimum House area mq is now changed to 22 
+* Observation with **n_rooms** as -1 was replaced with 1 for better clarity.
+
+
+## 2.2 EDA and summary of results  
+
+
+
+#### Further Univariate analysis of each variable 
+
+
+```{r}
+ggplot(data=mydf, aes(x=floor)) + geom_bar()
+```
+
+```{r}
+ggplot(data=mydf, aes(x=n_rooms)) + geom_bar()
+ggplot(data=mydf, aes(x=n_bathrooms)) + geom_bar()
+```
+
+
+
+```{r}
+ggplot(data=mydf, aes(x=heating)) + geom_bar()
+```
+
+
+```{r}
+ggplot(data=mydf, aes(x=has_alarm)) + geom_bar()
+ggplot(data=mydf, aes(x=has_terrace)) + geom_bar()
+ggplot(data=mydf, aes(x=has_parking)) + geom_bar() + ggtitle("Bar plot Analysis of Parking Status")
+ggplot(data=mydf, aes(x=has_air_conditioning)) + geom_bar()
+```
+
+```{r}
+ggplot(data=mydf, aes(x=is_furnished)) + geom_bar()
+```
+
+
+
+
+#### Observations
+
+* As mentioned earlier, more than 50% of houses in the data does not have the facilities mentioned such as air_conditioning, Parking,heating, alarm, terrace and also not furnished
+* Number of Houses is high when the number of floors is less
+
+
+#### Multivariate analysis
+
+* Based on the Research Question 3 it is evident that **price** is the dependent variable , and also **is_furnished** in relation to the question number 4
+* Below we created analysis to understand the relationship between the dependent variable **price** vs rest of the variable
+
+```{r}
+ggplot(mydf,aes(mq,price))+geom_point()+geom_smooth(method = 'lm')+ggtitle("price Vs mq")
+```
+
+```{r}
+ggplot(mydf,aes(log_mq,log_house_price))+geom_point()+geom_smooth(method = 'lm')+ggtitle("log_house_price Vs log_mq")
+```
+
+```{r}
+ggplot(mydf,aes(log_mq,price))+geom_point()+geom_smooth(method = 'lm')+ggtitle("price vs log_mq")
+```
+
+```{r}
+ggplot(mydf,aes(mq,log_house_price))+geom_point()+geom_smooth(method = 'lm')+ggtitle("mq vs log_house_price")
+```
+
+
+#### Observation
+
+* Based on the multivariate analysis between price vs mq , log_house_price vs log_mq and log_house_price Vs mq shows that there is some correlation, when the house area square meter increases the price also increases
+
+```{r}
+ggplot(mydf,aes(x=floor,y=price))+geom_bar(stat='identity')+ggtitle("price Vs Number of floors")
+ggplot(mydf,aes(x=n_rooms,y=price))+geom_bar(stat='identity')+ggtitle("price Vs Number of Rooms")
+ggplot(mydf,aes(x=n_bathrooms,y=price))+geom_bar(stat='identity')+ggtitle("price Vs Number of Bathrooms")
+```
+```{r}
+ggplot(mydf,aes(x=has_air_conditioning,y=price))+geom_bar(stat='identity')+ggtitle("price Vs Air Conditioning Status")
+ggplot(mydf,aes(x=is_furnished,y=price))+geom_bar(stat='identity')+ggtitle("price Vs Furnished status")
+```
+
+#### Observation
+
+* Based on the Multivariate Analysis between price and other variables like Air conditioning Status and Furnished Status, it cost more when the facilities are not available 
+* When the number of floors increases the price of the house is decreasing like wise when the number of bathrooms is high the price of House is high
+* Where as the price is fluctuating when it comes to the number of rooms in the house
+
+## 2.3 Additional insights and issues
+
+
+* From the Analysis the chances of house with higher Area in mq is not directly proportional to price (meaning higher the are doesnt mean we will have higher price)
+* Having all Facilities does not create major impact on the price , based on the data we could see houses with facilities is having very less price compared to the contrary, similarly the same goes when it comes to number of Floors as well.
+* This shows that the subset of the data we use might have not covered the entire depth of data.
+
+# 3. Modelling
+
+## 3.1 Explain your analysis plan
+
+* Based on the Research Question Our dependent Variable is **Price**
+* From the analysis of Data (1.3) , we identified that the dependent variable price was having outliers and Not normally distributes as well, due to this reason we will consider the log transformed value for the further study
+* since we have multiple categorical as well as numerical independent variable affects the single numerical dependent variable, hence we will use Multiple Linear Regression
+* We will start with creating a model assuming all the variables have in the data versus the dependent Variable price
+
+## 3.2 Build a model for property price
+
+* Validating the Dataframe for the Columns with Variables which we want to include in our Modelling
+
+```{r}
+head(mydf[,2:12])
+```
+
+* Constructing Multiple Linear Regression - Maximal Model considering all the Variable to identify which will be best suited.
+
+```{r}
+model<-lm(log_house_price~.,data = mydf[,2:12])
+summary(model)
+```
+
+```{r}
+step(model)
+```
+* Final Minimal Model based on the Formula after the Step Function above.
+
+```{r}
+model2 <-  lm(formula = log_house_price ~ mq + n_rooms + n_bathrooms + has_terrace + 
+    heating, data = mydf[, 2:12])
+summary(model2)
+```
+
+#### Observation
+
+* Above is the linear model creation with all possible variables, from that used the **step** function to get the Optimal variables which can be used to the best fitted model. The resulted linear regression is  below,
+
+$$
+log(price) = 9.8331333 + 0.0021927*mq + 1.1696811*nrooms2 + 1.3595547*nrooms3 + 1.3363290*nrooms4 + 1.3048422*nrooms5 + 0.3770455*nbathrooms2 + 0.7173311*nbathrooms3 + 0.3357561*hasterrace1 + 0.1506109*heatingother
+$$
+
+* From this the model describes that average log price of the house is 9.93, this in further increase by 0.002 for each unit increase in the House meter square.
+* Similarly the house price increases by 1.16, 1.35, 1.34 and 1.30 if there is an unit increase of n_room2, n_room3, n_room4 and n_room5 respectively compared to n_room1
+* With respect increase in unit to  the n_bathrooms2 and n_bathrooms3 the log price of house increase by 0.38 and 0.72 respectively
+* When it comes to the heating for each unit increase in heatingother the log price of house increase by 0.15 than that of heating autonomous
+* Log price of House will increase by 0.34 for each unit increase in the has_terrace1 than others
+
+
+```{r}
+summary(mydf$log_house_price - model$fitted.values)
+```
+
+* The residual Values shows that our data is not symmetrical and based on the mean and median value, 
+$$
+median > mean
+$$
+
+statues that the sample data we have is left skewed which in turn states that the model is not predicting well on the lower price values that it does for the higher price values.
+* The Multiple R-Squared  value explains that ~22.6% variation within the log price (Dependent Variable) and the other independent variables are explaining. In other words there is ~22.6% of variation withing the log Price.
+* This further shows that our model is not best fitting the data very well.
+* Further in relation to the p-value which is less than 0.05 which leads to the rejection of Null hypothesis and accepting Alternate Hypothesis, thus stating there is some relation exists between some variable with the Dependent Varibale in the data
+
+## 3.3 Critique model using relevant diagnostics
+
+* Graphical Representation of the Finally generated Model - Model2
+
+
+```{r}
+plot(model2)
+```
+
+
+#### Observation
+
+* Residual Vs Fitted does not show any distinctive pattern, which mean there is a linear relationship
+* From the QQ plot it shows that there are more number of outliers on the lower end , apart from that the residuals shows fairly a normal distribution
+* Based on spread location Graph, it shows that the residual spread is random.
+* Residual Vs Leverage graph shows that the we are barely able to see data cook's distance which in turn depicts that even though there are outliers in the data , none them are an influential cases.
+
+## 3.4 Suggest improvements to your model
+
+*Based on the findings in 3.2 and 3.3 articulates possible alternative approaches to address them (5 marks).*
+
+* Based on the Finding from 3.2 & 3.3 the model is not best fitted with current set of data. This might be due to the richness and quantity of the data taken into consideration
+* To have better throughput or understanding we should be increasing the sample size or we should research on the other types of Model to evaluate 
+
+
+# 4. Extension work
+
+## 4.1 Model the likelihood of a property being furnished (using the is_furnished variable provided).
+
+*Given this second research question (i.e., involving the binary target attribute) provide a plan of analysis based on relevant EDA for this attribute (10 marks). The model is described, explained and critiqued (10 marks).*
+*NB Submissions where suitable models do not have good fit due to the nature of the data will not be penalised.* 
+
+* Model the likelihood of a property based on the binary variable **is_furnished** , for the Purpose of using the binary Dependent Variable we will utilize the Logistic Regression with Maximal Model
+
+```{r}
+table(mydf$is_furnished)
+```
+
+* This shows the Spread of the **is_furnished** out of the 903 Observations we have `837` is **not furnished** and `66` are **furnished**
+
+#### Univariate ANalysis Graphical representation
+
+```{r}
+ggplot(data=mydf, aes(x=is_furnished)) + geom_bar() + ggtitle("Is_Furnished")
+```
+
+#### Relationship between Price and furnished status - Multivariate Analysis
+
+
+```{r}
+ggplot(mydf,aes(x=price,y=is_furnished))+geom_point()+ggtitle(" Furnished status Vs price")
+```
+
+* **Boxplot**
+
+```{r}
+ggplot(mydf,aes(x=price,y=is_furnished))+geom_boxplot()+ggtitle(" Furnished status Vs price")
+```
+* This shows that the Spread of the price in relation to the House furnished status is huge when there was no furniture than when it was furnished
+
+#### Modelbuilding
+
+
+```{r}
+furniture_glm2 <- glm(is_furnished~.,family = binomial,data=mydf[,2:12])
+summary(furniture_glm2)
+```
+
+
+```{r}
+step(furniture_glm2)
+```
+
+
+* Final Minimal Model based on the Formula after the Step Function above.
+
+```{r}
+glm(formula = is_furnished ~ mq + n_bathrooms + has_air_conditioning, family = binomial, data = mydf[, 2:12])
+```
+$$
+isfurnished = -2.288317 - 0.005397*mq + 0.159155*nbathrooms2 + 1.434236*nbathrooms3 + 0.492906*hasairconditioning1
+$$
+* In the below section we will identify the exponential coefficients to derive the model out come:
+
+```{r}
+exp(coef(furniture_glm2))
+```
+
+
+#### Observations
+
+Based on the coefficient estimates,
+
+* Likelihood of a house to be furnished is less when there increase in house area in meter square
+* Whereas the the chances for being furnished increase with increase in the number of bathrooms and has air_conditioning
+
+# References  
+
+
+* SKIMR: Quickly profile data in R (2021) YouTube. YouTube. Available at: https://www.youtube.com/watch?v=x23Lrn8smHk (Accessed: December 26, 2022). 
+* Kyaw Saw Htoon (2020) Log Transformation Purpose and Interpretation, Medium. Medium. Available at: https://medium.com/@kyawsawhtoon/log-transformation-purpose-and-interpretation-9444b4b049c9 (Accessed: December 28, 2022). 
+* Shepperd, M. (2022) CS5702 modern data book, 5.3 Checking for quality. Available at: https://bookdown.org/martin_shepperd/ModernDataBook/C5_DataQualCheck.html#C5_factors (Accessed: December 28, 2022). 
+* Shepperd, M. (2022) CS5702 modern data book, 5.4 Data cleaning and imputation. Available at: https://bookdown.org/martin_shepperd/ModernDataBook/C5_Cleaning.html#C5_Cleaning (Accessed: December 28, 2022). 
+* Shepperd, M. (2022) CS5702 modern data book, 4.1 Introducing exploratory data analysis. Available at: https://bookdown.org/martin_shepperd/ModernDataBook/C4_Intro.html#C4_Intro (Accessed: December 28, 2022). 
